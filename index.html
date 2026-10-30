@@ -86,7 +86,10 @@ const i=pts.findIndex(q=>dist(q,p)<18);if(i>=0){drag=i;return}stroke=closed?null
 c.onpointermove=e=>{if(!down)return;const p=pos(e);moved=Math.max(moved,dist(p,down));
 if(drag!==null&&moved>4)pts[drag]=p;else if(stroke)stroke.push(p);draw()};
 c.onpointerup=e=>{const p=pos(e);
-if(drag!==null){drag=null}
+if(drag!==null){
+ const index=drag;drag=null;
+ if(moved<8&&closed)editAngle(index);
+}
 else if(stroke){if(moved<8){if(pts.length>=3&&dist(p,pts[0])<20)closed=true;else pts.push(p)}
 else{let s=rdp(stroke,10);if(s.length>2&&dist(s[0],s[s.length-1])<30){s.pop();closed=true}
 if(pts.length&&!closed&&dist(pts[pts.length-1],s[0])<20)s.shift();pts=pts.concat(s)}}
@@ -94,6 +97,31 @@ else if(closed&&moved<8){for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1
 const cur=(dist(a,b)*scale).toFixed(2),v=prompt("Gemessene Länge dieser Kante in m:",cur);const L=parseFloat((v||"").replace(",","."));
 if(L>0)scale*=L/(dist(a,b)*scale);break}}}
 stroke=null;down=null;draw()};
+function interiorAngle(i){
+ const n=pts.length,a=pts[(i-1+n)%n],b=pts[i],d=pts[(i+1)%n];
+ const u={x:a.x-b.x,y:a.y-b.y},v={x:d.x-b.x,y:d.y-b.y};
+ const cross=u.x*v.y-u.y*v.x,dot=u.x*v.x+u.y*v.y;
+ let angle=Math.atan2(Math.abs(cross),dot)*180/Math.PI;
+ // For concave vertices use the reflex interior angle.
+ let signed=0;for(let j=0;j<n;j++){const q=pts[j],r=pts[(j+1)%n];signed+=q.x*r.y-r.x*q.y}
+ if(cross*signed>0)angle=360-angle;
+ return angle;
+}
+function editAngle(i){
+ if(!closed||pts.length<3)return;
+ const current=interiorAngle(i),raw=prompt("Innenwinkel an Ecke "+(i+1)+" in Grad (0–360):",current.toFixed(1));
+ if(raw===null)return;
+ const target=Number(raw.replace(",","."));
+ if(!Number.isFinite(target)||target<=0||target>=360){alert("Bitte einen Winkel zwischen 0 und 360° eingeben.");return}
+ const n=pts.length,b=pts[i],prev=pts[(i-1+n)%n],next=pts[(i+1)%n];
+ const radius=dist(b,next);if(radius<0.01||dist(b,prev)<0.01)return;
+ const base=Math.atan2(prev.y-b.y,prev.x-b.x);
+ const signedArea=pts.reduce((sum,q,j)=>{const r=pts[(j+1)%n];return sum+q.x*r.y-r.x*q.y},0);
+ const turn=(signedArea>=0?1:-1);
+ const theta=base+turn*(Math.PI-target*Math.PI/180);
+ next.x=b.x+radius*Math.cos(theta);next.y=b.y+radius*Math.sin(theta);
+ draw();
+}
 function area(){let s=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];s+=a.x*b.y-b.x*a.y}return Math.abs(s)/2*scale*scale}
 function per(){let s=0;for(let i=0;i<pts.length;i++)s+=dist(pts[i],pts[(i+1)%pts.length])*scale;return s}
 const st=n=>getComputedStyle(document.documentElement).getPropertyValue(n);
@@ -102,9 +130,24 @@ x.lineWidth=2.5;x.strokeStyle=ac;x.lineJoin="round";
 if(pts.length){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));if(closed){x.closePath();x.fillStyle=st("--fill");x.fill()}x.stroke()}
 if(stroke&&stroke.length>1){x.beginPath();stroke.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));x.setLineDash([5,5]);x.stroke();x.setLineDash([])}
 pts.forEach((p,i)=>{x.beginPath();x.arc(p.x,p.y,i==0?7:5,0,7);x.fillStyle=i==0?fg:ac;x.fill()});
+if(closed&&pts.length>=3){
+ x.font="bold 11px system-ui";x.textAlign="center";x.textBaseline="middle";
+ pts.forEach((p,i)=>{
+  const a=pts[(i-1+pts.length)%pts.length],b=pts[(i+1)%pts.length];
+  const u={x:a.x-p.x,y:a.y-p.y},v={x:b.x-p.x,y:b.y-p.y};
+  const ul=Math.hypot(u.x,u.y)||1,vl=Math.hypot(v.x,v.y)||1;
+  let dx=u.x/ul+v.x/vl,dy=u.y/ul+v.y/vl;
+  const norm=Math.hypot(dx,dy)||1;dx/=norm;dy/=norm;
+  const cx=p.x+dx*27,cy=p.y+dy*27;
+  const label=interiorAngle(i).toFixed(1).replace(".0","")+"°";
+  x.fillStyle=st("--card");x.fillRect(cx-22,cy-9,44,18);
+  x.fillStyle=fg;x.fillText(label,cx,cy);
+ });
+ x.textBaseline="alphabetic";
+}
 const n=closed?pts.length:pts.length-1;x.font="12px system-ui";x.fillStyle=fg;x.textAlign="center";
 for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%pts.length];x.fillText((dist(a,b)*scale).toFixed(2)+" m",(a.x+b.x)/2,(a.y+b.y)/2-6)}
-$("hint").textContent=closed?"Kante antippen = Länge eintragen (passt den Maßstab an). Punkte ziehen = verschieben.":"Mit dem Finger skizzieren oder Eckpunkte antippen. Erster Punkt antippen schließt die Fläche.";
+$("hint").textContent=closed?"Eckpunkt kurz antippen = Winkel ändern. Eckpunkt ziehen = verschieben. Kante antippen = Maßstab anpassen.":"Mit dem Finger skizzieren oder Eckpunkte antippen. Erster Punkt antippen schließt die Fläche.";
 calc()}
 const f2=(v,u,d=2)=>isFinite(v)?v.toLocaleString("de-DE",{maximumFractionDigits:d,minimumFractionDigits:d})+" "+u:"–";
 const g=id=>parseFloat(($(id).value||"0").replace(",","."))||0;
