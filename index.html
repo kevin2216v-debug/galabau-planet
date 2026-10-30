@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GaLaBau Gartenplaner</title>
+<meta name="theme-color" content="#2f7d3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Gartenplaner">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+:root{--bg:#f4f6f1;--fg:#1d2a1a;--card:#fff;--ac:#2f7d3a;--ln:#c9d3c4;--fill:rgba(47,125,58,.22);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141a13;--fg:#e6eee3;--card:#1e271c;--ac:#5fbf6b;--ln:#33422f;--fill:rgba(95,191,107,.25)}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif;padding:10px}
+h1{font-size:18px;margin:0 0 8px}h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px;margin-bottom:10px}
+canvas{width:100%;height:52vh;background:var(--card);border:1px solid var(--ln);border-radius:12px;touch-action:none;display:block}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 12px;font-size:14px}
+button.s{background:transparent;color:var(--fg);border:1px solid var(--ln)}
+label{display:flex;flex-direction:column;font-size:12px;gap:2px;flex:1;min-width:90px}
+input,select{font-size:16px;padding:8px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--fg);width:100%}
+table{width:100%;border-collapse:collapse}td{padding:5px 0;border-bottom:1px solid var(--ln)}td:last-child{text-align:right;font-weight:600}
+.hint{font-size:12px;opacity:.75;margin-top:6px}
+button:disabled{opacity:.5}
+#projects{min-width:180px;flex:2}
+.smallnote{font-size:12px;opacity:.8}
+</style></head><body>
+<h1>🌿 GaLaBau Gartenplaner</h1>
+<div class="card">
+<h2>Meine Projekte</h2>
+<div class="row">
+<label>Gespeicherte Projekte<select id="projects"><option value="">Projekt auswählen</option></select></label>
+</div>
+<div class="row">
+<button id="save">Projekt speichern</button>
+<button id="load" class="s">Öffnen</button>
+<button id="delete" class="s">Löschen</button>
+</div>
+<p class="smallnote">Projekte werden nur auf diesem Gerät gespeichert. Beim Löschen von Browserdaten können sie verloren gehen.</p>
+</div>
+<div class="card"><canvas id="c"></canvas>
+<div class="hint" id="hint"></div>
+<div class="row"><button id="undo" class="s">Zurück</button><button id="close" class="s">Fläche schließen</button><button id="reset" class="s">Neu</button></div></div>
+
+<div class="card"><h2>Fläche</h2><table>
+<tr><td>Fläche</td><td id="area">–</td></tr>
+<tr><td>Umfang (Randeinfassung)</td><td id="per">–</td></tr></table></div>
+
+<div class="card"><h2>Unterbau</h2>
+<div class="row" style="margin-top:0">
+<label>Frostschutz (cm)<input id="fs" type="number" value="25" inputmode="decimal"></label>
+<label>Splitt-Bettung (cm)<input id="sp" type="number" value="4" inputmode="decimal"></label></div>
+<div class="row">
+<label>Verdichtung (%)<input id="vd" type="number" value="20" inputmode="decimal"></label>
+<label>Verlust (%)<input id="vl" type="number" value="5" inputmode="decimal"></label></div>
+<table style="margin-top:8px">
+<tr><td>Frostschutz Volumen</td><td id="fsv">–</td></tr>
+<tr><td>Frostschutz Gewicht (ca. 1,8 t/m³ lose)</td><td id="fst">–</td></tr>
+<tr><td>Splitt Volumen</td><td id="spv">–</td></tr>
+<tr><td>Splitt Gewicht (ca. 1,5 t/m³ lose)</td><td id="spt">–</td></tr></table></div>
+
+<div class="card"><h2>Pflaster</h2>
+<div class="row" style="margin-top:0"><label>Format (L×B×H cm)<select id="pf"></select></label>
+<label>Fuge (mm)<input id="fg" type="number" value="3" inputmode="decimal"></label>
+<label>Verschnitt (%)<input id="vs" type="number" value="5" inputmode="decimal"></label></div>
+<table style="margin-top:8px">
+<tr><td>Steine je m²</td><td id="pm">–</td></tr>
+<tr><td>Steine gesamt</td><td id="pt">–</td></tr>
+<tr><td>Fläche inkl. Verschnitt</td><td id="pa">–</td></tr></table>
+<div class="hint">Richtwerte. Dichten und Verdichtung je nach Material anpassen, Mengen beim Lieferanten bestätigen.</div></div>
+
+<script>
+const F=[["Betonpflaster 20×10×8",20,10],["Betonpflaster 20×10×6",20,10],["Rechteck 20×16×8",20,16],["Quadrat 20×20×8",20,20],["Quadrat 30×30×6",30,30],["Rechteck 30×20×8",30,20],["Platte 40×20×8",40,20],["Platte 40×40×5",40,40],["Platte 60×40×8",60,40],["Platte 50×50×5",50,50],["Platte 60×60×4",60,60],["Kleinpflaster 10×10×10",10,10],["Großpflaster 16×16×16",16,16],["Platte 80×40×8",80,40]];
+const $=id=>document.getElementById(id);
+$("pf").innerHTML=F.map((f,i)=>`<option value="${i}">${f[0]}</option>`).join("");
+const c=$("c"),x=c.getContext("2d");let W,H,pts=[],closed=false,scale=0.01,drag=null,stroke=null,moved=0,down=null;
+function rs(){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;W=r.width;H=r.height;c.width=W*d;c.height=H*d;x.setTransform(d,0,0,d,0,0);if(!pts.length)scale=10/W;draw()}
+function pos(e){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function segD(p,a,b){const l=dist(a,b)**2||1;let t=((p.x-a.x)*(b.x-a.x)+(p.y-a.y)*(b.y-a.y))/l;t=Math.max(0,Math.min(1,t));return dist(p,{x:a.x+t*(b.x-a.x),y:a.y+t*(b.y-a.y)})}
+function rdp(p,e){if(p.length<3)return p;let m=0,k=0;for(let i=1;i<p.length-1;i++){const d=segD(p[i],p[0],p[p.length-1]);if(d>m){m=d;k=i}}
+if(m>e)return rdp(p.slice(0,k+1),e).slice(0,-1).concat(rdp(p.slice(k),e));return[p[0],p[p.length-1]]}
+c.onpointerdown=e=>{c.setPointerCapture(e.pointerId);const p=pos(e);down=p;moved=0;
+const i=pts.findIndex(q=>dist(q,p)<18);if(i>=0){drag=i;return}stroke=closed?null:[p]};
+c.onpointermove=e=>{if(!down)return;const p=pos(e);moved=Math.max(moved,dist(p,down));
+if(drag!==null&&moved>4)pts[drag]=p;else if(stroke)stroke.push(p);draw()};
+c.onpointerup=e=>{const p=pos(e);
+if(drag!==null){drag=null}
+else if(stroke){if(moved<8){if(pts.length>=3&&dist(p,pts[0])<20)closed=true;else pts.push(p)}
+else{let s=rdp(stroke,10);if(s.length>2&&dist(s[0],s[s.length-1])<30){s.pop();closed=true}
+if(pts.length&&!closed&&dist(pts[pts.length-1],s[0])<20)s.shift();pts=pts.concat(s)}}
+else if(closed&&moved<8){for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];if(segD(p,a,b)<16){
+const cur=(dist(a,b)*scale).toFixed(2),v=prompt("Gemessene Länge dieser Kante in m:",cur);const L=parseFloat((v||"").replace(",","."));
+if(L>0)scale*=L/(dist(a,b)*scale);break}}}
+stroke=null;down=null;draw()};
+function area(){let s=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];s+=a.x*b.y-b.x*a.y}return Math.abs(s)/2*scale*scale}
+function per(){let s=0;for(let i=0;i<pts.length;i++)s+=dist(pts[i],pts[(i+1)%pts.length])*scale;return s}
+const st=n=>getComputedStyle(document.documentElement).getPropertyValue(n);
+function draw(){x.clearRect(0,0,W,H);const ac=st("--ac"),fg=st("--fg");
+x.lineWidth=2.5;x.strokeStyle=ac;x.lineJoin="round";
+if(pts.length){x.beginPath();pts.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));if(closed){x.closePath();x.fillStyle=st("--fill");x.fill()}x.stroke()}
+if(stroke&&stroke.length>1){x.beginPath();stroke.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));x.setLineDash([5,5]);x.stroke();x.setLineDash([])}
+pts.forEach((p,i)=>{x.beginPath();x.arc(p.x,p.y,i==0?7:5,0,7);x.fillStyle=i==0?fg:ac;x.fill()});
+const n=closed?pts.length:pts.length-1;x.font="12px system-ui";x.fillStyle=fg;x.textAlign="center";
+for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%pts.length];x.fillText((dist(a,b)*scale).toFixed(2)+" m",(a.x+b.x)/2,(a.y+b.y)/2-6)}
+$("hint").textContent=closed?"Kante antippen = Länge eintragen (passt den Maßstab an). Punkte ziehen = verschieben.":"Mit dem Finger skizzieren oder Eckpunkte antippen. Erster Punkt antippen schließt die Fläche.";
+calc()}
+const f2=(v,u,d=2)=>isFinite(v)?v.toLocaleString("de-DE",{maximumFractionDigits:d,minimumFractionDigits:d})+" "+u:"–";
+const g=id=>parseFloat(($(id).value||"0").replace(",","."))||0;
+function calc(){const A=closed?area():0;$("area").textContent=closed?f2(A,"m²"):"–";$("per").textContent=closed?f2(per(),"m"):"–";
+const vd=1+g("vd")/100,vl=1+g("vl")/100;
+const fv=A*g("fs")/100*vd*vl,sv=A*g("sp")/100*vl;
+$("fsv").textContent=f2(fv,"m³");$("fst").textContent=f2(fv*1.8,"t");$("spv").textContent=f2(sv,"m³");$("spt").textContent=f2(sv*1.5,"t");
+const f=F[$("pf").value],fu=g("fg")/10,pm=10000/((f[1]+fu)*(f[2]+fu)),ab=A*(1+g("vs")/100);
+$("pm").textContent=f2(pm,"Stk.",1);$("pt").textContent=closed?Math.ceil(pm*ab).toLocaleString("de-DE")+" Stk.":"–";$("pa").textContent=f2(ab,"m²")}
+document.querySelectorAll("input,select").forEach(e=>e.oninput=calc);
+$("undo").onclick=()=>{if(closed)closed=false;else pts.pop();draw()};
+$("close").onclick=()=>{if(pts.length>=3)closed=true;draw()};
+$("reset").onclick=()=>{pts=[];closed=false;scale=10/W;draw()};
+addEventListener("resize",rs);rs();
+
+// Projektverwaltung: Speicherung ausschließlich lokal auf dem jeweiligen Gerät.
+const STORE_KEY="galabau_gartenplaner_projects_v1";
+const DRAFT_KEY="galabau_gartenplaner_draft_v1";
+const fieldIds=["fs","sp","vd","vl","pf","fg","vs"];
+let activeProjectId=null;
+function getProjects(){
+  try {const v=JSON.parse(localStorage.getItem(STORE_KEY)||"[]");return Array.isArray(v)?v:[]}
+  catch(e){return []}
+}
+function snapshot(){
+  return {points:pts.map(p=>({x:p.x/W,y:p.y/H})),closed,metersPerWidth:scale*W,
+    fields:Object.fromEntries(fieldIds.map(id=>[id,$(id).value]))};
+}
+function restore(data){
+  if(!data || !Array.isArray(data.points))return;
+  pts=data.points.map(p=>({x:p.x*W,y:p.y*H}));
+  closed=!!data.closed;
+  scale=(Number(data.metersPerWidth)||10)/W;
+  for(const id of fieldIds)if(data.fields && data.fields[id]!==undefined)$(id).value=data.fields[id];
+  draw();
+}
+function refreshProjects(){
+  const list=getProjects();
+  $("projects").replaceChildren(new Option("Projekt auswählen",""),
+    ...list.map(p=>new Option(p.name,p.id)));
+  if(activeProjectId && list.some(p=>p.id===activeProjectId))$("projects").value=activeProjectId;
+}
+$("save").onclick=()=>{
+  const list=getProjects();
+  const current=list.find(p=>p.id===activeProjectId);
+  const name=prompt("Projektname:",current?.name||"Gartenprojekt");
+  if(name===null)return;
+  if(!name.trim()){alert("Bitte einen Projektnamen eingeben.");return}
+  const id=activeProjectId||String(Date.now());
+  const project={id,name:name.trim(),updated:new Date().toISOString(),data:snapshot()};
+  const index=list.findIndex(p=>p.id===id);
+  if(index>=0)list[index]=project;else list.push(project);
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(list));activeProjectId=id;refreshProjects();alert("Projekt gespeichert.")}
+  catch(e){alert("Speichern fehlgeschlagen. Bitte freien Gerätespeicher prüfen.")}
+};
+$("load").onclick=()=>{
+  const id=$("projects").value;
+  const project=getProjects().find(p=>p.id===id);
+  if(!project){alert("Bitte ein Projekt auswählen.");return}
+  if(!confirm("Aktuelle Zeichnung durch „"+project.name+"“ ersetzen?"))return;
+  activeProjectId=id;restore(project.data);
+};
+$("delete").onclick=()=>{
+  const id=$("projects").value;
+  const project=getProjects().find(p=>p.id===id);
+  if(!project)return;
+  if(!confirm("Projekt „"+project.name+"“ endgültig löschen?"))return;
+  localStorage.setItem(STORE_KEY,JSON.stringify(getProjects().filter(p=>p.id!==id)));
+  if(activeProjectId===id)activeProjectId=null;
+  refreshProjects();
+};
+$("reset").onclick=()=>{pts=[];closed=false;scale=10/W;activeProjectId=null;draw()};
+let draftTimer;
+function saveDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(()=>{try{localStorage.setItem(DRAFT_KEY,JSON.stringify(snapshot()))}catch(e){}},350);
+}
+const originalDraw=draw;
+draw=function(){originalDraw();saveDraft()};
+refreshProjects();
+try{const draft=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");if(draft)restore(draft)}catch(e){}
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+
+</script></body></html>

@@ -1,0 +1,11 @@
+GaLaBau Gartenplaner – Installation
+
+1. Den INHALT dieses ZIP-Archivs auf einen HTTPS-Webspace hochladen.
+2. Im iPhone Safari die URL zu index.html öffnen.
+3. Teilen > Zum Home-Bildschirm > Hinzufügen.
+4. Auf Android im Chrome-Menü „App installieren“ auswählen.
+
+Die App funktioniert nach dem ersten vollständigen Online-Aufruf auch offline.
+Projekte werden ausschließlich lokal auf dem jeweiligen Gerät gespeichert.
+Wichtig: Kein Passwortschutz enthalten; jeder mit dem Link kann die App öffnen.
+Für privaten Zugang einen Passwortschutz am Webserver einrichten.
